@@ -1,0 +1,6 @@
+{
+  "name": "Skyora - Intelligent Personalized Weather",
+  "description": "Intelligent personalization layer for India's national weather service, transforming meteorological data into contextual, actionable guidance tailored to your daily activities and routines.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
