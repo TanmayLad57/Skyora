@@ -11,13 +11,18 @@ import {
   Check,
   Compass,
   SlidersHorizontal,
+  LogOut,
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface TopBarProps {
   onOpenMobileMenu: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   const {
     profile,
     activePersonaId,
@@ -236,8 +241,22 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
 
           {showPersonaMenu && (
             <div className="absolute right-0 mt-1.5 w-72 bg-white rounded-lg shadow-lg border border-slate-200 py-1.5 z-50 text-slate-800 animate-in fade-in duration-100">
+              {user && (
+                <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/70">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Logged in as
+                  </div>
+                  <div className="text-xs font-bold text-slate-900 truncate">
+                    {user.user_metadata?.full_name || profile.name}
+                  </div>
+                  <div className="text-[11px] text-slate-500 truncate font-mono">
+                    {user.email}
+                  </div>
+                </div>
+              )}
+
               <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                SIH Hackathon Demo Personas
+                Switch Demo Persona
               </div>
 
               {/* Persona 1: Aarav */}
@@ -299,6 +318,23 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
                   Delhi destination · 32°C thundershowers · Packing list
                 </p>
               </button>
+
+              {/* Sign Out Button */}
+              <div className="border-t border-slate-100 mt-1 pt-1">
+                <button
+                  type="button"
+                  id="topbar-signout-btn"
+                  onClick={async () => {
+                    setShowPersonaMenu(false);
+                    await signOut();
+                    navigate('/login', { replace: true });
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors font-semibold"
+                >
+                  <LogOut className="w-3.5 h-3.5 text-rose-500" />
+                  <span>Sign Out of Skyora</span>
+                </button>
+              </div>
             </div>
           )}
         </div>

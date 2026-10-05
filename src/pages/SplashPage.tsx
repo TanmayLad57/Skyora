@@ -39,7 +39,7 @@ export const SplashPage: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => navigate('/onboarding')}
+            onClick={() => navigate('/register')}
             className="text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg transition-colors shadow-xs"
           >
             Get Started

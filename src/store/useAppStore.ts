@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { UserProfile, ActivityType, TemperatureUnit, CardFeedback, UserInteraction } from '../types';
+import { UserProfile, ActivityType, TemperatureUnit, CardFeedback, UserInteraction, SavedLocation } from '../types';
 
 // Preset personas for immediate live evaluation
 export const DEMO_PERSONAS: Record<string, UserProfile> = {
@@ -100,11 +100,20 @@ interface AppState {
   submitFeedback: (cardId: string, cardType: string, vote: 'up' | 'down') => void;
   logInteraction: (type: UserInteraction['type'], target: string) => void;
   updateProfile: (partial: Partial<UserProfile>) => void;
+  setLocations: (locations: SavedLocation[]) => void;
+  addLocation: (location: SavedLocation) => void;
+  removeLocation: (locationId: string) => void;
   toggleActivity: (activity: ActivityType) => void;
   setUnits: (unit: TemperatureUnit) => void;
   resetPersonalization: () => void;
   deleteUserData: () => void;
   completeOnboarding: (newProfile: UserProfile) => void;
+  syncWithSupabase: (data: {
+    profile?: Partial<UserProfile>;
+    locations?: SavedLocation[];
+    feedbacks?: CardFeedback[];
+    interactions?: UserInteraction[];
+  }) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -224,6 +233,61 @@ export const useAppStore = create<AppState>()(
           },
           activePersonaId: 'custom',
         }));
+      },
+
+      setLocations: (locations) => {
+        set((state) => ({
+          profile: {
+            ...state.profile,
+            locations,
+            activeLocationId: locations.length > 0 ? (locations.some(l => l.id === state.profile.activeLocationId) ? state.profile.activeLocationId : locations[0].id) : state.profile.activeLocationId,
+          },
+        }));
+      },
+
+      addLocation: (location) => {
+        set((state) => ({
+          profile: {
+            ...state.profile,
+            locations: [...state.profile.locations, location],
+            activeLocationId: location.id,
+          },
+        }));
+      },
+
+      removeLocation: (locationId) => {
+        set((state) => {
+          const filtered = state.profile.locations.filter((l) => l.id !== locationId);
+          return {
+            profile: {
+              ...state.profile,
+              locations: filtered,
+              activeLocationId:
+                state.profile.activeLocationId === locationId
+                  ? filtered[0]?.id || ''
+                  : state.profile.activeLocationId,
+            },
+          };
+        });
+      },
+
+      syncWithSupabase: (data) => {
+        set((state) => {
+          const nextProfile = data.profile
+            ? { ...state.profile, ...data.profile }
+            : state.profile;
+          if (data.locations && data.locations.length > 0) {
+            nextProfile.locations = data.locations;
+            if (!data.locations.some((l) => l.id === nextProfile.activeLocationId)) {
+              nextProfile.activeLocationId = data.locations[0].id;
+            }
+          }
+          return {
+            profile: nextProfile,
+            feedbacks: data.feedbacks !== undefined ? data.feedbacks : state.feedbacks,
+            interactions: data.interactions !== undefined ? data.interactions : state.interactions,
+          };
+        });
       },
 
       toggleActivity: (activity) => {

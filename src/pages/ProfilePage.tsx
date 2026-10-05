@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../services/supabase';
+import { saveUserPreferences } from '../services/preferencesService';
 import { ActivityType, TemperatureUnit } from '../types';
 import {
   User,
@@ -13,9 +17,15 @@ import {
   Clock,
   Activity,
   Bell,
+  LogOut,
+  Mail,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 
 export const ProfilePage: React.FC = () => {
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   const {
     profile,
     updateProfile,
@@ -28,6 +38,9 @@ export const ProfilePage: React.FC = () => {
   const [nameInput, setNameInput] = useState(profile.name);
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+  const [saveErrorMsg, setSaveErrorMsg] = useState<string | null>(null);
 
   const allActivities: ActivityType[] = [
     'Running',
@@ -41,10 +54,109 @@ export const ProfilePage: React.FC = () => {
     'General',
   ];
 
-  const handleSaveName = () => {
-    updateProfile({ name: nameInput });
-    setShowSavedToast(true);
-    setTimeout(() => setShowSavedToast(false), 2500);
+  const persistPreferencesToSupabase = async (partial: {
+    activities?: string[];
+    preferredUnits?: TemperatureUnit;
+    morningOrEvening?: string;
+    commuteStartHour?: number;
+    commuteEndHour?: number;
+    notificationsEnabled?: boolean;
+  }) => {
+    if (!user) return;
+    setIsSaving(true);
+    setSaveErrorMsg(null);
+    try {
+      const { error } = await saveUserPreferences(user.id, {
+        activities: partial.activities || profile.selectedActivities,
+        preferredUnits: partial.preferredUnits || profile.units,
+        morningOrEvening: partial.morningOrEvening || profile.preferences.preferredTimeOfDay,
+        commuteStartHour: partial.commuteStartHour ?? profile.preferences.commuteWindow?.startHour ?? 18,
+        commuteEndHour: partial.commuteEndHour ?? profile.preferences.commuteWindow?.endHour ?? 19,
+        notificationsEnabled: partial.notificationsEnabled ?? profile.preferences.notificationsEnabled ?? true,
+      });
+
+      if (error) {
+        setSaveErrorMsg('Unable to save your preferences. Please try again.');
+      } else {
+        setSaveSuccessMsg('Preferences saved to cloud successfully.');
+        setTimeout(() => setSaveSuccessMsg(null), 2500);
+      }
+    } catch {
+      setSaveErrorMsg('Unable to save your preferences.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveName = async () => {
+    if (!nameInput.trim()) return;
+    updateProfile({ name: nameInput.trim() });
+
+    if (user) {
+      setIsSaving(true);
+      setSaveErrorMsg(null);
+      try {
+        const { error } = await supabase.auth.updateUser({
+          data: { full_name: nameInput.trim() },
+        });
+        if (error) {
+          setSaveErrorMsg('Unable to update your name in auth.');
+        } else {
+          setSaveSuccessMsg('Profile name updated successfully.');
+          setTimeout(() => setSaveSuccessMsg(null), 2500);
+        }
+      } catch {
+        setSaveErrorMsg('Unable to update name.');
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      setShowSavedToast(true);
+      setTimeout(() => setShowSavedToast(false), 2500);
+    }
+  };
+
+  const handleSetUnits = async (u: TemperatureUnit) => {
+    setUnits(u);
+    await persistPreferencesToSupabase({ preferredUnits: u });
+  };
+
+  const handleToggleActivity = async (act: ActivityType) => {
+    toggleActivity(act);
+    const list = [...profile.selectedActivities];
+    const idx = list.indexOf(act);
+    if (idx >= 0) {
+      if (list.length > 1) list.splice(idx, 1);
+    } else {
+      list.push(act);
+    }
+    await persistPreferencesToSupabase({ activities: list });
+  };
+
+  const handleUpdateCommute = async (startH: number) => {
+    updateProfile({
+      preferences: {
+        ...profile.preferences,
+        commuteWindow: { startHour: startH, endHour: startH + 1 },
+      },
+    });
+    await persistPreferencesToSupabase({
+      commuteStartHour: startH,
+      commuteEndHour: startH + 1,
+    });
+  };
+
+  const handleToggleNotifications = async () => {
+    const nextVal = !profile.preferences.notificationsEnabled;
+    updateProfile({
+      preferences: {
+        ...profile.preferences,
+        notificationsEnabled: nextVal,
+      },
+    });
+    await persistPreferencesToSupabase({
+      notificationsEnabled: nextVal,
+    });
   };
 
   const handleRemoveInferred = (key: string) => {
@@ -68,6 +180,21 @@ export const ProfilePage: React.FC = () => {
         </p>
       </div>
 
+      {/* Toast / Alert Notifications */}
+      {saveSuccessMsg && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2 animate-in fade-in">
+          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{saveSuccessMsg}</span>
+        </div>
+      )}
+
+      {saveErrorMsg && (
+        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center gap-2 animate-in fade-in">
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+          <span>{saveErrorMsg}</span>
+        </div>
+      )}
+
       {showSavedToast && (
         <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2">
           <Check className="w-4 h-4 text-emerald-600" />
@@ -90,14 +217,17 @@ export const ProfilePage: React.FC = () => {
                 type="text"
                 value={nameInput}
                 onChange={(e) => setNameInput(e.target.value)}
+                disabled={isSaving}
                 className="flex-1 text-xs p-2.5 rounded-lg border border-slate-200 text-slate-900"
               />
               <button
                 type="button"
                 onClick={handleSaveName}
-                className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold"
+                disabled={isSaving}
+                className="px-3 py-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5"
               >
-                Update
+                {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />}
+                <span>Update</span>
               </button>
             </div>
           </div>
@@ -111,14 +241,14 @@ export const ProfilePage: React.FC = () => {
                 <button
                   key={u}
                   type="button"
-                  onClick={() => setUnits(u)}
+                  onClick={() => handleSetUnits(u)}
                   className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-all ${
                     profile.units === u
                       ? 'bg-amber-500 border-amber-600 text-white shadow-xs'
                       : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
-                  Celsius (°C)
+                  {u === 'C' ? 'Celsius (°C)' : 'Fahrenheit (°F)'}
                 </button>
               ))}
             </div>
@@ -144,7 +274,7 @@ export const ProfilePage: React.FC = () => {
               <button
                 key={act}
                 type="button"
-                onClick={() => toggleActivity(act)}
+                onClick={() => handleToggleActivity(act)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
                   isSelected
                     ? 'bg-slate-900 text-white font-semibold'
@@ -190,19 +320,39 @@ export const ProfilePage: React.FC = () => {
             <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between">
               <div>
                 <span className="font-semibold text-slate-800 block">Commute Transit Window</span>
-                <span className="text-slate-500 font-mono">
-                  {profile.preferences.commuteWindow?.startHour}:00 – {profile.preferences.commuteWindow?.endHour}:00
-                </span>
+                <select
+                  value={profile.preferences.commuteWindow?.startHour ?? 18}
+                  onChange={(e) => handleUpdateCommute(Number(e.target.value))}
+                  className="mt-1 text-xs p-1.5 rounded border border-slate-200 bg-white font-mono"
+                >
+                  <option value={8}>08:00 – 09:00 (Morning)</option>
+                  <option value={9}>09:00 – 10:00 (Late Morning)</option>
+                  <option value={17}>17:00 – 18:00 (Early Evening)</option>
+                  <option value={18}>18:00 – 19:00 (Evening Rush)</option>
+                  <option value={19}>19:00 – 20:00 (Night Transit)</option>
+                </select>
               </div>
-              <span className="text-emerald-700 font-medium text-[11px]">Active</span>
+              <span className="text-emerald-700 font-medium text-[11px]">Saved in Cloud</span>
             </div>
 
             <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between">
               <div>
-                <span className="font-semibold text-slate-800 block">Precipitation Sensitivity</span>
-                <span className="text-slate-500 capitalize">{profile.preferences.rainThresholdSensitivity}</span>
+                <span className="font-semibold text-slate-800 block">Severe Weather Notifications</span>
+                <span className="text-slate-500">
+                  {profile.preferences.notificationsEnabled ? 'Enabled' : 'Disabled'}
+                </span>
               </div>
-              <span className="text-emerald-700 font-medium text-[11px]">Active</span>
+              <button
+                type="button"
+                onClick={handleToggleNotifications}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-md border transition-colors ${
+                  profile.preferences.notificationsEnabled
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                    : 'bg-slate-100 border-slate-300 text-slate-600'
+                }`}
+              >
+                {profile.preferences.notificationsEnabled ? 'Active' : 'Muted'}
+              </button>
             </div>
           </div>
         </div>
@@ -274,7 +424,49 @@ export const ProfilePage: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. Danger Zone: Reset & Delete */}
+      {/* 4. Supabase Account & Authentication */}
+      <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-sm font-bold text-slate-900">
+            Account & Supabase Authentication
+          </h2>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 flex items-center gap-1">
+            <ShieldCheck className="w-3 h-3" />
+            <span>Authenticated</span>
+          </span>
+        </div>
+        <p className="text-xs text-slate-500 mb-4">
+          Manage your cloud authentication session and security credentials.
+        </p>
+
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-3.5 bg-slate-50 rounded-xl border border-slate-200/80">
+          <div className="space-y-0.5">
+            <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
+              <User className="w-3.5 h-3.5 text-amber-500" />
+              <span>{user?.user_metadata?.full_name || profile.name}</span>
+            </div>
+            <div className="text-[11px] text-slate-500 flex items-center gap-2 font-mono">
+              <Mail className="w-3.5 h-3.5 text-slate-400" />
+              <span>{user?.email || 'authenticated-user@skyora.imd.gov.in'}</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            id="profile-signout-btn"
+            onClick={async () => {
+              await signOut();
+              navigate('/login', { replace: true });
+            }}
+            className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors"
+          >
+            <LogOut className="w-3.5 h-3.5 text-rose-600" />
+            <span>Sign Out</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 5. Danger Zone: Reset & Delete */}
       <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs">
         <h2 className="text-sm font-bold text-slate-900 mb-1">
           Privacy & Storage Administration

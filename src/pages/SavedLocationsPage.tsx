@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
+import { useAuth } from '../context/AuthContext';
 import { SavedLocation, LocationType } from '../types';
 import { POPULAR_LOCATIONS } from '../services/mockScenarios';
+import { createLocation, deleteLocation } from '../services/locationsService';
 import {
   MapPin,
   Plus,
@@ -13,14 +15,21 @@ import {
   Sprout,
   Plane,
   Navigation,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 
 export const SavedLocationsPage: React.FC = () => {
-  const { profile, updateProfile, setActiveLocation } = useAppStore();
+  const { user } = useAuth();
+  const { profile, updateProfile, setActiveLocation, addLocation, removeLocation } = useAppStore();
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedCity, setSelectedCity] = useState(POPULAR_LOCATIONS[0].city);
   const [selectedType, setSelectedType] = useState<LocationType>('Home');
+  const [isSaving, setIsSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const locationTypeIcons: Record<LocationType, any> = {
     Home: Home,
@@ -40,30 +49,75 @@ export const SavedLocationsPage: React.FC = () => {
     Current: 'Real-time GPS coordinates for immediate localized radar updates.',
   };
 
-  const handleAddLocation = () => {
+  const handleAddLocation = async () => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
     const pop = POPULAR_LOCATIONS.find((p) => p.city === selectedCity) || POPULAR_LOCATIONS[0];
-    const newLoc: SavedLocation = {
-      id: `loc-${Date.now()}`,
-      name: pop.city,
-      state: pop.state,
-      type: selectedType,
-      lat: pop.lat,
-      lon: pop.lon,
-    };
 
-    updateProfile({
-      locations: [...profile.locations, newLoc],
-    });
-    setShowAddForm(false);
+    if (user) {
+      setIsSaving(true);
+      try {
+        const { data: newLoc, error } = await createLocation(user.id, {
+          cityName: pop.city,
+          label: selectedType,
+          latitude: pop.lat,
+          longitude: pop.lon,
+        });
+
+        if (error || !newLoc) {
+          setErrorMsg('Unable to save this location. Please try again.');
+        } else {
+          addLocation(newLoc);
+          setSuccessMsg(`Location ${pop.city} added successfully.`);
+          setShowAddForm(false);
+          setTimeout(() => setSuccessMsg(null), 3000);
+        }
+      } catch {
+        setErrorMsg('Unable to save this location.');
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      const newLoc: SavedLocation = {
+        id: `loc-${Date.now()}`,
+        name: pop.city,
+        state: pop.state,
+        type: selectedType,
+        lat: pop.lat,
+        lon: pop.lon,
+      };
+      updateProfile({
+        locations: [...profile.locations, newLoc],
+      });
+      setShowAddForm(false);
+    }
   };
 
-  const handleDeleteLocation = (id: string) => {
+  const handleDeleteLocation = async (id: string) => {
     if (profile.locations.length <= 1) return; // Keep at least one
-    const filtered = profile.locations.filter((l) => l.id !== id);
-    updateProfile({
-      locations: filtered,
-      activeLocationId: profile.activeLocationId === id ? filtered[0].id : profile.activeLocationId,
-    });
+    setErrorMsg(null);
+
+    if (user) {
+      setDeletingId(id);
+      try {
+        const { error } = await deleteLocation(id);
+        if (error) {
+          setErrorMsg('Unable to delete location from cloud.');
+        } else {
+          removeLocation(id);
+        }
+      } catch {
+        setErrorMsg('Unable to delete location.');
+      } finally {
+        setDeletingId(null);
+      }
+    } else {
+      const filtered = profile.locations.filter((l) => l.id !== id);
+      updateProfile({
+        locations: filtered,
+        activeLocationId: profile.activeLocationId === id ? filtered[0].id : profile.activeLocationId,
+      });
+    }
   };
 
   return (
@@ -88,6 +142,21 @@ export const SavedLocationsPage: React.FC = () => {
           <span>Add Location</span>
         </button>
       </div>
+
+      {/* Alert Banners */}
+      {successMsg && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2 animate-in fade-in">
+          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{successMsg}</span>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center gap-2 animate-in fade-in">
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
 
       {/* Add Location Modal / Form */}
       {showAddForm && (
@@ -134,6 +203,7 @@ export const SavedLocationsPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setShowAddForm(false)}
+              disabled={isSaving}
               className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-900"
             >
               Cancel
@@ -141,9 +211,11 @@ export const SavedLocationsPage: React.FC = () => {
             <button
               type="button"
               onClick={handleAddLocation}
-              className="px-4 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800"
+              disabled={isSaving}
+              className="px-4 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 disabled:bg-slate-700 flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
             >
-              Save Location
+              {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />}
+              <span>{isSaving ? 'Saving...' : 'Save Location'}</span>
             </button>
           </div>
         </div>
@@ -215,11 +287,16 @@ export const SavedLocationsPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleDeleteLocation(loc.id)}
-                    className="p-2 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                    disabled={deletingId === loc.id}
+                    className="p-2 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors disabled:opacity-50"
                     title="Remove location"
                     aria-label="Remove location"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    {deletingId === loc.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
                   </button>
                 )}
               </div>

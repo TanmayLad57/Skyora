@@ -1,5 +1,6 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import {
   Home,
   CloudSun,
@@ -13,6 +14,7 @@ import {
   Users,
   Lock,
   CloudLightning,
+  LogOut,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -20,6 +22,8 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
+  const navigate = useNavigate();
+  const { signOut, user } = useAuth();
   const navItems = [
     { label: 'Personalized Home', path: '/', icon: Home },
     { label: 'Weather Details', path: '/weather-details', icon: CloudSun },
@@ -86,6 +90,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
             </NavLink>
           );
         })}
+        {/* Sign Out Option */}
+        <button
+          type="button"
+          onClick={async () => {
+            if (onCloseMobile) onCloseMobile();
+            await signOut();
+            navigate('/login', { replace: true });
+          }}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 transition-colors"
+        >
+          <div className="flex items-center gap-2.5">
+            <LogOut className="w-4 h-4 shrink-0" />
+            <span>Sign Out</span>
+          </div>
+        </button>
       </nav>
 
       {/* Privacy Note at Bottom */}
@@ -94,7 +113,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
           <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
           <div className="text-[11px] leading-relaxed">
             <span className="font-semibold text-slate-700 block">Privacy First</span>
-            Your profile and personal preferences stay encrypted solely on this device.
+            Your routines and preferences stay encrypted on this device.
           </div>
         </div>
       </div>

@@ -1,5 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
+import { useAuth } from '../context/AuthContext';
+import { saveRecommendation } from '../services/recommendationsService';
 import { getWeatherData } from '../services/weather';
 import { rankCards } from '../engine/rank';
 import { EngineCard } from '../types';
@@ -18,12 +20,15 @@ import { FarmingAdvisoryCard } from '../components/cards/FarmingAdvisoryCard';
 import { AskSkyoraPromptCard } from '../components/cards/AskSkyoraPromptCard';
 
 export const HomePage: React.FC = () => {
+  const { user } = useAuth();
   const {
     profile,
     simulatedHour,
     activeModeOverride,
     feedbacks,
   } = useAppStore();
+
+  const lastSavedRecKeyRef = useRef<string>('');
 
   // Find active location name
   const activeLocation =
@@ -45,6 +50,28 @@ export const HomePage: React.FC = () => {
       activeModeOverride
     );
   }, [profile, weather, simulatedHour, feedbacks, activeModeOverride]);
+
+  // Persist generated top recommendation to Supabase recommendations table
+  useEffect(() => {
+    if (!user) return;
+    const topRec = rankedCards.find((c) => c.type === 'top_recommendation');
+    if (!topRec || !topRec.data) return;
+
+    const key = `${activeLocation.name}_${simulatedHour}_${topRec.id}_${topRec.data.headline}`;
+    if (key === lastSavedRecKeyRef.current) return;
+    lastSavedRecKeyRef.current = key;
+
+    saveRecommendation(user.id, topRec.type, {
+      headline: topRec.data.headline,
+      subtext: topRec.data.subtext,
+      contextTag: topRec.data.contextTag,
+      cityName: activeLocation.name,
+      hour: simulatedHour,
+      reason: topRec.reason,
+    }).catch((err) => {
+      console.error('Failed to save recommendation to Supabase:', err);
+    });
+  }, [user, rankedCards, activeLocation.name, simulatedHour]);
 
   // Map each engine card descriptor to its component
   const renderCard = (card: EngineCard) => {

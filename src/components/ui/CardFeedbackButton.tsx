@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { ThumbsUp, ThumbsDown, HelpCircle, Check, X } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+import { useAuth } from '../../context/AuthContext';
+import { submitFeedback as submitSupabaseFeedback } from '../../services/feedbackService';
 
 interface CardFeedbackButtonProps {
   cardId: string;
@@ -15,16 +17,31 @@ export const CardFeedbackButton: React.FC<CardFeedbackButtonProps> = ({
   reason,
   className = '',
 }) => {
+  const { user } = useAuth();
   const { feedbacks, submitFeedback } = useAppStore();
   const [showReason, setShowReason] = useState(false);
   const [justVoted, setJustVoted] = useState<string | null>(null);
 
   const existingVote = feedbacks.find((f) => f.cardId === cardId)?.vote;
 
-  const handleVote = (vote: 'up' | 'down') => {
+  const handleVote = async (vote: 'up' | 'down') => {
+    // 1. Instant local store update for immediate reactivity
     submitFeedback(cardId, cardType, vote);
     setJustVoted(vote);
     setTimeout(() => setJustVoted(null), 2500);
+
+    // 2. Persist to Supabase feedback table
+    if (user) {
+      try {
+        await submitSupabaseFeedback(
+          user.id,
+          cardId,
+          vote === 'up' ? 'positive' : 'negative'
+        );
+      } catch (err) {
+        console.error('Failed to submit feedback to Supabase:', err);
+      }
+    }
   };
 
   return (

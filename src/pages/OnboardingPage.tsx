@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
+import { useAuth } from '../context/AuthContext';
+import { saveUserPreferences } from '../services/preferencesService';
+import { createLocation } from '../services/locationsService';
+import { supabase } from '../services/supabase';
 import { ActivityType, TemperatureUnit, LocationType, UserProfile } from '../types';
 import { POPULAR_LOCATIONS } from '../services/mockScenarios';
 import { getWeatherData } from '../services/weather';
@@ -16,11 +20,14 @@ import {
   Sparkles,
   Shield,
   Eye,
+  Loader2,
 } from 'lucide-react';
 
 export const OnboardingPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { completeOnboarding } = useAppStore();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [step, setStep] = useState<number>(1);
 
@@ -99,9 +106,43 @@ export const OnboardingPage: React.FC = () => {
   const previewCards = rankCards(draftProfile, previewWeather, 17, []);
   const topRecCard = previewCards.find((c) => c.type === 'top_recommendation');
 
-  const handleFinish = () => {
-    completeOnboarding(draftProfile);
-    navigate('/');
+  const handleFinish = async () => {
+    setIsSubmitting(true);
+    try {
+      if (user) {
+        // 1. Persist preferences to Supabase
+        await saveUserPreferences(user.id, {
+          activities: selectedActivities,
+          preferredUnits: units,
+          morningOrEvening: timeOfDay,
+          commuteStartHour: commuteStart,
+          commuteEndHour: commuteStart + 1,
+          notificationsEnabled: notifications,
+        });
+
+        // 2. Persist location to Supabase
+        const pop = POPULAR_LOCATIONS.find((p) => p.city === selectedCity) || POPULAR_LOCATIONS[0];
+        await createLocation(user.id, {
+          label: locationType,
+          cityName: selectedCity,
+          latitude: pop.lat,
+          longitude: pop.lon,
+        });
+
+        // 3. Update auth user name metadata if present
+        if (name.trim()) {
+          await supabase.auth.updateUser({ data: { full_name: name.trim() } });
+        }
+      }
+      completeOnboarding(draftProfile);
+      navigate('/');
+    } catch (err) {
+      console.error('Error saving onboarding data to Supabase:', err);
+      completeOnboarding(draftProfile);
+      navigate('/');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -398,10 +439,20 @@ export const OnboardingPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleFinish}
-                  className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-sm"
+                  disabled={isSubmitting}
+                  className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-sm cursor-pointer disabled:cursor-not-allowed"
                 >
-                  <span>Complete & Launch Skyora</span>
-                  <Check className="w-4 h-4" />
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Saving Profile to Cloud...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Complete & Launch Skyora</span>
+                      <Check className="w-4 h-4" />
+                    </>
+                  )}
                 </button>
               )}
             </div>

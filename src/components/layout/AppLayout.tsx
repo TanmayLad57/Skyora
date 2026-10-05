@@ -1,11 +1,50 @@
-import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
+import { useAuth } from '../../context/AuthContext';
+import { useAppStore } from '../../store/useAppStore';
+import { recordInteraction } from '../../services/interactionsService';
 import { X } from 'lucide-react';
 
 export const AppLayout: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const location = useLocation();
+  const { user } = useAuth();
+  const { logInteraction } = useAppStore();
+  const lastTrackedPathRef = useRef<string>('');
+
+  useEffect(() => {
+    const currentPath = location.pathname;
+    if (currentPath === lastTrackedPathRef.current) return;
+    lastTrackedPathRef.current = currentPath;
+
+    // Map path to meaningful screen name
+    const screenMap: Record<string, string> = {
+      '/': 'dashboard',
+      '/weather-details': 'weather_details',
+      '/activities': 'activities',
+      '/time-finder': 'time_finder',
+      '/ask-skyora': 'ask_skyora',
+      '/alerts': 'alerts',
+      '/habits': 'habits',
+      '/locations': 'locations',
+      '/profile': 'profile',
+      '/test-personas': 'test_personas',
+    };
+
+    const screenName = screenMap[currentPath] || currentPath.replace('/', '') || 'dashboard';
+
+    // Log locally in store
+    logInteraction('view_screen', screenName);
+
+    // Persist to Supabase interactions table
+    if (user) {
+      recordInteraction(user.id, screenName).catch((err) => {
+        console.error('Failed to record screen interaction to Supabase:', err);
+      });
+    }
+  }, [location.pathname, user, logInteraction]);
 
   return (
     <div className="flex h-screen w-full bg-slate-50 overflow-hidden font-sans">
