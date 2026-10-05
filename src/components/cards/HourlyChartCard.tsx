@@ -8,7 +8,7 @@ interface HourlyChartCardProps {
 }
 
 export const HourlyChartCard: React.FC<HourlyChartCardProps> = ({ card }) => {
-  const { hourly, userWindow, dryWindow } = card.data;
+  const { hourly, userWindow, dryWindow, currentTemp, currentHour } = card.data;
 
   return (
     <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs transition-all">
@@ -33,6 +33,8 @@ export const HourlyChartCard: React.FC<HourlyChartCardProps> = ({ card }) => {
         hourly={hourly}
         userWindow={userWindow}
         dryWindow={dryWindow}
+        currentTemp={currentTemp}
+        currentHour={currentHour}
       />
     </div>
   );

@@ -5,11 +5,12 @@ export function evaluateSuitability(
   weather: WeatherData,
   targetHour?: number
 ): ActivitySuitability {
-  // If target hour is specified, inspect that hour's forecast, otherwise current weather
+  // If target hour is specified, inspect that hour's forecast for trends, while using canonical current temperature
   const currentHour = targetHour !== undefined ? targetHour : 17; // default 17:30
   const hourData = weather.hourly.find((h) => h.hour === currentHour) || weather.hourly[17] || weather.hourly[0];
 
-  const temp = hourData ? hourData.temp : weather.temp;
+  // Canonical current temperature (matches hero card and live observation)
+  const temp = weather.temp;
   const rainProb = hourData ? hourData.rainProb : weather.rainProb;
   const wind = hourData ? hourData.windSpeedKm : weather.windSpeedKm;
   const humidity = hourData ? hourData.humidity : weather.humidity;

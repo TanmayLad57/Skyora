@@ -150,6 +150,8 @@ export function rankCards(
       hourly: weather.hourly,
       userWindow: userActivityWindow,
       dryWindow: weather.rainProb > 40 ? dryWindow : undefined,
+      currentTemp: weather.temp,
+      currentHour: currentHour,
     },
   });
 

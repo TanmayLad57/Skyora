@@ -373,6 +373,13 @@ export async function fetchLiveWeatherData(
       const timeHours = nowTime.getHours().toString().padStart(2, '0');
       const timeMins = nowTime.getMinutes().toString().padStart(2, '0');
 
+      // Ensure the current hour bucket in hourlyList matches the canonical live current observation
+      const currentHourIdx = nowTime.getHours();
+      if (hourlyList[currentHourIdx]) {
+        hourlyList[currentHourIdx].temp = Math.round(current.temperature_2m ?? 28);
+        hourlyList[currentHourIdx].feelsLike = Math.round(current.apparent_temperature ?? current.temperature_2m ?? 28);
+      }
+
       const liveData: WeatherData = {
         city: cityName,
         state,

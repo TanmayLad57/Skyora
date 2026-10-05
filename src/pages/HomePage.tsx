@@ -76,35 +76,73 @@ export const HomePage: React.FC = () => {
     }
   };
 
-  // Group by named architectural slots determined strictly by the engine
-  const heroCards = rankedCards.filter((c) => c.slot === 'hero');
-  const primaryCards = rankedCards.filter((c) => c.slot === 'primary');
-  const chartCards = rankedCards.filter((c) => c.slot === 'chart');
-  const secondaryCards = rankedCards.filter((c) => c.slot === 'secondary');
-  const sidebarCards = rankedCards.filter((c) => c.slot === 'sidebar');
+  // Group cards for the exact presentation sequence requested:
+  // 1. Official Alerts (if present, at the very top)
+  const officialAlertCards = rankedCards.filter((c) => c.type === 'official_alert');
+
+  // 2. Running Advisory (Top Recommendation) + Activity Conditions (Grouped together)
+  const recommendationCards = rankedCards.filter((c) => c.type === 'top_recommendation');
+  const activityConditionCards = rankedCards.filter((c) => c.type === 'activity_condition');
+
+  // 3. Smart Time Finder / Context Advisories
+  const timeFinderCards = rankedCards.filter(
+    (c) =>
+      c.type === 'smart_time_window' ||
+      c.type === 'travel_packing' ||
+      c.type === 'farming_advisory'
+  );
+
+  // 4. Hero weather summary card (Location, greeting, condition, temperature, precipitation potential)
+  const heroCards = rankedCards.filter((c) => c.type === 'hero_weather');
+
+  // 5. Hourly Chart Card
+  const chartCards = rankedCards.filter((c) => c.type === 'hourly_chart');
+
+  // 6. Atmospheric Indicators + 7-Day Outlook + Ask Skyora Panel (Relative layout preserved)
+  const secondaryCards = rankedCards.filter(
+    (c) => c.type === 'weather_metrics' || c.type === 'daily_forecast'
+  );
+  const sidebarCards = rankedCards.filter((c) => c.type === 'ask_skyora_prompt');
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-200">
-      {/* 1. HERO SLOT (Weather overview) */}
-      <section className="space-y-4">
-        {heroCards.map(renderCard)}
-      </section>
-
-      {/* 2. PRIMARY ACTION & ALERTS SLOT (Ranks top recommendation, official alert, activity conditions) */}
-      {primaryCards.length > 0 && (
+      {/* 1. OFFICIAL ALERTS (Severe weather warnings remain at the very top) */}
+      {officialAlertCards.length > 0 && (
         <section className="space-y-4">
-          {primaryCards.map(renderCard)}
+          {officialAlertCards.map(renderCard)}
         </section>
       )}
 
-      {/* 3. CHART & TEMPORAL SLOT */}
+      {/* 2. TOP RECOMMENDATION + ACTIVITY CONDITIONS (Grouped together) */}
+      {(recommendationCards.length > 0 || activityConditionCards.length > 0) && (
+        <section className="space-y-4">
+          {recommendationCards.map(renderCard)}
+          {activityConditionCards.map(renderCard)}
+        </section>
+      )}
+
+      {/* 3. SMART TIME FINDER CARD */}
+      {timeFinderCards.length > 0 && (
+        <section className="space-y-4">
+          {timeFinderCards.map(renderCard)}
+        </section>
+      )}
+
+      {/* 4. HERO WEATHER SUMMARY CARD */}
+      {heroCards.length > 0 && (
+        <section className="space-y-4">
+          {heroCards.map(renderCard)}
+        </section>
+      )}
+
+      {/* 5. HOURLY CHART CARD */}
       {chartCards.length > 0 && (
         <section className="space-y-4">
           {chartCards.map(renderCard)}
         </section>
       )}
 
-      {/* 4. SECONDARY & SIDEBAR SLOTS: 2-Column Responsive Layout */}
+      {/* 6. ATMOSPHERIC INDICATORS + 7-DAY OUTLOOK + ASK SKYORA (2-Column Layout) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         <div className="lg:col-span-2 space-y-6">
           {secondaryCards.map(renderCard)}

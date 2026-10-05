@@ -5,17 +5,26 @@ interface HourlyChartProps {
   hourly: HourlyForecast[];
   userWindow?: { label: string; startHour: number; endHour: number };
   dryWindow?: { label: string; startHour: number; endHour: number };
+  currentTemp?: number;
+  currentHour?: number;
 }
 
 export const HourlyChart: React.FC<HourlyChartProps> = ({
   hourly,
   userWindow,
   dryWindow,
+  currentTemp,
+  currentHour,
 }) => {
   const [hoveredHour, setHoveredHour] = useState<HourlyForecast | null>(null);
 
-  // We display 24 hours (0 to 23)
-  const displayHours = hourly.slice(0, 24);
+  // We display 24 hours (0 to 23), ensuring currentTemp is the canonical source of truth for current hour
+  const displayHours = hourly.slice(0, 24).map((h) => {
+    if (currentHour !== undefined && h.hour === currentHour && currentTemp !== undefined) {
+      return { ...h, temp: currentTemp };
+    }
+    return h;
+  });
   const minTemp = Math.min(...displayHours.map((h) => h.temp)) - 2;
   const maxTemp = Math.max(...displayHours.map((h) => h.temp)) + 2;
   const tempRange = Math.max(maxTemp - minTemp, 4);
@@ -209,7 +218,8 @@ export const HourlyChart: React.FC<HourlyChartProps> = ({
           {displayHours.map((h, i) => {
             const cx = getX(i);
             const cy = getY(h.temp);
-            const showLabel = i % 3 === 0 || h.hour === 17 || h.hour === 18;
+            const isCurrentMoment = currentHour !== undefined && h.hour === currentHour;
+            const showLabel = i % 3 === 0 || h.hour === 17 || h.hour === 18 || isCurrentMoment;
 
             return (
               <g
@@ -227,13 +237,25 @@ export const HourlyChart: React.FC<HourlyChartProps> = ({
                   fill="transparent"
                 />
 
+                {/* Current moment highlight pulse ring */}
+                {isCurrentMoment && (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r="8"
+                    fill="#F59E0B"
+                    fillOpacity="0.25"
+                    className="animate-pulse"
+                  />
+                )}
+
                 {/* Point circle */}
                 <circle
                   cx={cx}
                   cy={cy}
-                  r={hoveredHour?.hour === h.hour ? 5 : 3}
-                  fill={hoveredHour?.hour === h.hour ? '#D97706' : '#FFFFFF'}
-                  stroke="#F59E0B"
+                  r={hoveredHour?.hour === h.hour || isCurrentMoment ? 5 : 3}
+                  fill={hoveredHour?.hour === h.hour ? '#D97706' : isCurrentMoment ? '#F59E0B' : '#FFFFFF'}
+                  stroke={isCurrentMoment ? '#B45309' : '#F59E0B'}
                   strokeWidth="2"
                   className="transition-all"
                 />
@@ -244,7 +266,9 @@ export const HourlyChart: React.FC<HourlyChartProps> = ({
                     x={cx}
                     y={cy - 8}
                     textAnchor="middle"
-                    className="text-[11px] font-semibold fill-slate-800 font-mono tabular-nums"
+                    className={`text-[11px] font-mono tabular-nums ${
+                      isCurrentMoment ? 'font-bold fill-amber-950' : 'font-semibold fill-slate-800'
+                    }`}
                   >
                     {h.temp}°
                   </text>
@@ -256,7 +280,9 @@ export const HourlyChart: React.FC<HourlyChartProps> = ({
                     x={cx}
                     y={padTop + chartH + 18}
                     textAnchor="middle"
-                    className="text-[11px] fill-slate-500 font-mono"
+                    className={`text-[11px] font-mono ${
+                      isCurrentMoment ? 'font-bold fill-amber-900' : 'fill-slate-500'
+                    }`}
                   >
                     {h.time}
                   </text>
