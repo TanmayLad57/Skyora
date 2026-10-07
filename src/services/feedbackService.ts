@@ -18,8 +18,19 @@ export const submitFeedback = async (
   feedbackType: 'positive' | 'negative'
 ): Promise<{ data: SupabaseFeedback | null; error: Error | null }> => {
   try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { data: null, error: authError || new Error('User not authenticated') };
+    }
+
+    const currentUserId = user.id;
+
     const payload = {
-      user_id: userId,
+      user_id: currentUserId,
       recommendation_id: recommendationId,
       feedback_type: feedbackType,
     };
@@ -46,13 +57,24 @@ export const submitFeedback = async (
  * Fetch all feedback submitted by the current authenticated user.
  */
 export const getFeedback = async (
-  userId: string
+  userId?: string
 ): Promise<{ data: CardFeedback[] | null; error: Error | null }> => {
   try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { data: null, error: authError || new Error('User not authenticated') };
+    }
+
+    const currentUserId = user.id;
+
     const { data, error } = await supabase
       .from('feedback')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', currentUserId)
       .order('created_at', { ascending: false });
 
     if (error) {

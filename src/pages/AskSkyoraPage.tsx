@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
+import { useAuth } from '../context/AuthContext';
 import { getWeatherData } from '../services/weather';
 import { generateSkyoraResponse, ChatMessage } from '../services/askSkyora';
 import {
@@ -11,6 +12,7 @@ import {
 } from 'lucide-react';
 
 export const AskSkyoraPage: React.FC = () => {
+  const { user } = useAuth();
   const { profile, simulatedHour, logInteraction } = useAppStore();
   const location = useLocation();
   const navigate = useNavigate();
@@ -21,13 +23,16 @@ export const AskSkyoraPage: React.FC = () => {
 
   const weather = getWeatherData(activeLocation.name, simulatedHour, profile.units);
 
+  const displayName = user?.user_metadata?.full_name || profile.name || 'User';
+  const firstName = displayName.split(' ')[0];
+
   const [inputQuery, setInputQuery] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
       sender: 'skyora',
-      text: `Hello ${profile.name.split(' ')[0]}! I'm Skyora's contextual assistant. I combine national meteorological radar data with your **${profile.primaryActivity}** routine in **${weather.city}**. How can I help plan your day?`,
+      text: `Hello ${firstName}! I'm Skyora's contextual assistant. I combine national meteorological radar data with your **${profile.primaryActivity}** routine in **${weather.city}**. How can I help plan your day?`,
       timestamp: 'Just now',
       contextSources: ['User Profile Context', 'IMD Regional Radar'],
     },

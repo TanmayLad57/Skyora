@@ -26,16 +26,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const { syncWithSupabase } = useAppStore();
+  const { syncWithSupabase, initializeUserProfile, clearUserSessionData } = useAppStore();
 
   const syncUserDataFromSupabase = useCallback(async (authUser: User) => {
     try {
       const userId = authUser.id;
       const fullName =
-        authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Skyora User';
+        authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User';
+
+      // Immediately initialize user profile in store with current authenticated user
+      initializeUserProfile(userId, fullName);
 
       // 1. Fetch / Initialize User Preferences
-      const { data: prefData } = await getUserPreferences(userId);
+      const { data: prefData, error: prefErr } = await getUserPreferences(userId);
       let activities: ActivityType[] = ['Running', 'Driving'];
       let units: TemperatureUnit = 'C';
       let commuteStart = 18;
@@ -62,7 +65,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (prefData.notifications_enabled !== undefined) {
           notifications = prefData.notifications_enabled;
         }
-      } else {
+      } else if (!prefErr) {
         // First-time user: seed initial preferences row in Supabase
         await saveUserPreferences(userId, {
           activities: ['Running', 'Driving'],
@@ -75,8 +78,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       // 2. Fetch / Initialize User Locations
-      let { data: locData } = await getLocations(userId);
-      if (!locData || locData.length === 0) {
+      let { data: locData, error: locErr } = await getLocations(userId);
+      if ((!locData || locData.length === 0) && !locErr) {
         // Seed default initial location in Supabase
         const { data: newLoc } = await createLocation(userId, {
           cityName: 'Mumbai',
@@ -93,7 +96,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // 4. Fetch User Interaction History
       const { data: interactionData } = await getInteractions(userId);
 
-      // Sync into zustand store
+      // Sync into zustand store belonging ONLY to this authenticated user
       syncWithSupabase({
         profile: {
           id: userId,
@@ -116,7 +119,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (err) {
       console.error('Error syncing user data from Supabase:', err);
     }
-  }, [syncWithSupabase]);
+  }, [syncWithSupabase, initializeUserProfile]);
 
   const refreshUserData = useCallback(async () => {
     if (user) {
@@ -136,9 +139,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
         if (mounted) {
           setSession(initialSession);
-          setUser(initialSession?.user ?? null);
-          if (initialSession?.user) {
-            await syncUserDataFromSupabase(initialSession.user);
+          const currentUser = initialSession?.user ?? null;
+          setUser(currentUser);
+          if (currentUser) {
+            await syncUserDataFromSupabase(currentUser);
+          } else {
+            clearUserSessionData();
           }
           setIsLoading(false);
         }
@@ -146,6 +152,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       .catch((err) => {
         console.error('Unexpected error checking session:', err);
         if (mounted) {
+          clearUserSessionData();
           setIsLoading(false);
         }
       });
@@ -156,9 +163,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       if (mounted) {
         setSession(newSession);
-        setUser(newSession?.user ?? null);
-        if (newSession?.user) {
-          await syncUserDataFromSupabase(newSession.user);
+        const nextUser = newSession?.user ?? null;
+        setUser(nextUser);
+        if (nextUser) {
+          await syncUserDataFromSupabase(nextUser);
+        } else {
+          clearUserSessionData();
         }
         setIsLoading(false);
       }
@@ -168,13 +178,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [syncUserDataFromSupabase]);
+  }, [syncUserDataFromSupabase, clearUserSessionData]);
 
   const signOut = async () => {
     try {
       await supabase.auth.signOut();
       setSession(null);
       setUser(null);
+      clearUserSessionData();
     } catch (err) {
       console.error('Error during sign out:', err);
     }

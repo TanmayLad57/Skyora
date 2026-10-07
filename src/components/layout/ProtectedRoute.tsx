@@ -1,10 +1,12 @@
 import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useAppStore } from '../../store/useAppStore';
 import { CloudLightning, Loader2 } from 'lucide-react';
 
 export const ProtectedRoute: React.FC = () => {
   const { session, isLoading } = useAuth();
+  const { activePersonaId } = useAppStore();
   const location = useLocation();
 
   if (isLoading) {
@@ -23,7 +25,12 @@ export const ProtectedRoute: React.FC = () => {
     );
   }
 
-  if (!session) {
+  const isDemoPersona =
+    activePersonaId === 'aarav' ||
+    activePersonaId === 'neha' ||
+    activePersonaId === 'rahul';
+
+  if (!session && !isDemoPersona) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

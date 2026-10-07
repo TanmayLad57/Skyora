@@ -31,13 +31,24 @@ export const parseTimeToHour = (timeStr?: string | null): number => {
  * Fetch preferences for a specific user from Supabase user_preferences table.
  */
 export const getUserPreferences = async (
-  userId: string
+  userId?: string
 ): Promise<{ data: SupabaseUserPreferences | null; error: Error | null }> => {
   try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { data: null, error: authError || new Error('User not authenticated') };
+    }
+
+    const currentUserId = user.id;
+
     const { data, error } = await supabase
       .from('user_preferences')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', currentUserId)
       .maybeSingle();
 
     if (error) {
@@ -67,8 +78,19 @@ export const saveUserPreferences = async (
   }
 ): Promise<{ data: SupabaseUserPreferences | null; error: Error | null }> => {
   try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { data: null, error: authError || new Error('User not authenticated') };
+    }
+
+    const currentUserId = user.id;
+
     const payload = {
-      user_id: userId,
+      user_id: currentUserId,
       activities: preferences.activities,
       preferred_units: preferences.preferredUnits,
       morning_or_evening: preferences.morningOrEvening || 'evening',

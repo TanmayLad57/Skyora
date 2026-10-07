@@ -16,9 +16,20 @@ export const recordInteraction = async (
   screenViewed: string
 ): Promise<{ data: SupabaseInteraction | null; error: Error | null }> => {
   try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { data: null, error: authError || new Error('User not authenticated') };
+    }
+
+    const currentUserId = user.id;
+
     const payload = {
-      user_id: userId,
-      screen_viewed: screenViewed,
+      user_id: currentUserId,
+      screen_viewed: screenViewed || 'dashboard',
     };
 
     const { data, error } = await supabase
@@ -43,14 +54,25 @@ export const recordInteraction = async (
  * Fetch recorded screen interactions for the current authenticated user.
  */
 export const getInteractions = async (
-  userId: string,
+  userId?: string,
   limit = 50
 ): Promise<{ data: UserInteraction[] | null; error: Error | null }> => {
   try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { data: null, error: authError || new Error('User not authenticated') };
+    }
+
+    const currentUserId = user.id;
+
     const { data, error } = await supabase
       .from('interactions')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', currentUserId)
       .order('created_at', { ascending: false })
       .limit(limit);
 

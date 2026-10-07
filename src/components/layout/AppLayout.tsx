@@ -12,12 +12,13 @@ export const AppLayout: React.FC = () => {
   const location = useLocation();
   const { user } = useAuth();
   const { logInteraction } = useAppStore();
-  const lastTrackedPathRef = useRef<string>('');
+  const lastTrackedKeyRef = useRef<string>('');
 
   useEffect(() => {
     const currentPath = location.pathname;
-    if (currentPath === lastTrackedPathRef.current) return;
-    lastTrackedPathRef.current = currentPath;
+    const trackingKey = `${user?.id || 'anon'}_${currentPath}`;
+    if (trackingKey === lastTrackedKeyRef.current) return;
+    lastTrackedKeyRef.current = trackingKey;
 
     // Map path to meaningful screen name
     const screenMap: Record<string, string> = {

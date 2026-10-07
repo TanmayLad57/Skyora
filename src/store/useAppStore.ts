@@ -114,20 +114,39 @@ interface AppState {
     feedbacks?: CardFeedback[];
     interactions?: UserInteraction[];
   }) => void;
+  clearUserSessionData: () => void;
+  initializeUserProfile: (userId: string, fullName: string) => void;
 }
+
+export const createDefaultProfile = (userId = '', fullName = 'User'): UserProfile => ({
+  id: userId,
+  name: fullName,
+  units: 'C',
+  primaryActivity: 'Running',
+  selectedActivities: ['Running', 'Driving'],
+  locations: [
+    { id: 'loc-default', name: 'Mumbai', state: 'Maharashtra', type: 'Home', lat: 19.076, lon: 72.8777, isPrimary: true },
+  ],
+  activeLocationId: 'loc-default',
+  preferences: {
+    preferredTimeOfDay: 'evening',
+    commuteWindow: { startHour: 18, endHour: 19 },
+    activityWindow: { activity: 'Running', startHour: 18, endHour: 19 },
+    notificationsEnabled: true,
+    rainThresholdSensitivity: 'high',
+  },
+  inferredPreferences: {},
+});
 
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
-      profile: DEMO_PERSONAS.aarav,
-      activePersonaId: 'aarav',
+      profile: createDefaultProfile(),
+      activePersonaId: 'custom',
       simulatedHour: 17, // default to 5:30 PM evening demo
       activeModeOverride: undefined,
       feedbacks: [],
-      interactions: [
-        { id: 'i-1', type: 'view_screen', target: 'home', timestamp: Date.now() - 3600000 * 2, hourOfDay: 17 },
-        { id: 'i-2', type: 'view_screen', target: 'activities', targetName: 'Running', timestamp: Date.now() - 3600000, hourOfDay: 17 } as any,
-      ],
+      interactions: [],
       hasCompletedOnboarding: true,
 
       setPersona: (personaKey) => {
@@ -347,6 +366,30 @@ export const useAppStore = create<AppState>()(
           activePersonaId: 'custom',
           hasCompletedOnboarding: true,
         });
+      },
+
+      clearUserSessionData: () => {
+        set({
+          profile: createDefaultProfile(),
+          activePersonaId: 'custom',
+          activeModeOverride: undefined,
+          feedbacks: [],
+          interactions: [],
+          simulatedHour: 17,
+        });
+      },
+
+      initializeUserProfile: (userId, fullName) => {
+        set((state) => ({
+          profile: {
+            ...state.profile,
+            id: userId,
+            name: fullName || 'User',
+          },
+          activePersonaId: 'custom',
+          feedbacks: [],
+          interactions: [],
+        }));
       },
     }),
     {

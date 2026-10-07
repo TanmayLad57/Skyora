@@ -127,24 +127,21 @@ export const RegisterPage: React.FC = () => {
         return;
       }
 
-      // Update local profile name in store
-      updateProfile({ name: fullName.trim() });
-
-      // If user session is created immediately (Supabase email confirmations disabled)
+      // If a session was automatically created, sign out so the user explicitly logs in
       if (data.session) {
-        setSuccessMessage('Account created successfully! Redirecting to Skyora...');
-        setTimeout(() => {
-          navigate('/', { replace: true });
-        }, 1200);
-      } else {
-        // If confirmation email is sent or account needs email verification
-        setSuccessMessage(
-          'Account created successfully! Please check your email inbox to verify your account, or sign in now.'
-        );
-        setTimeout(() => {
-          navigate('/login', { replace: true });
-        }, 2500);
+        await supabase.auth.signOut();
       }
+
+      setSuccessMessage('Account created successfully. Please log in.');
+      setTimeout(() => {
+        navigate('/login', {
+          replace: true,
+          state: {
+            message: 'Account created successfully. Please log in.',
+            email: email.trim(),
+          },
+        });
+      }, 1200);
     } catch (err: any) {
       setErrorMessage(getFriendlyErrorMessage(err));
       setIsLoading(false);

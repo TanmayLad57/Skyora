@@ -21,13 +21,15 @@ export const LoginPage: React.FC = () => {
   const location = useLocation();
   const { setPersona, updateProfile } = useAppStore();
 
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState((location.state as any)?.email || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(
+    (location.state as any)?.message || null
+  );
 
   // Field validation errors
   const [errors, setErrors] = useState<{
@@ -78,7 +80,6 @@ export const LoginPage: React.FC = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-    setSuccessMessage(null);
 
     if (isLoading) return;
 
@@ -100,18 +101,31 @@ export const LoginPage: React.FC = () => {
         return;
       }
 
-      if (data.session && data.user) {
-        // Sync full name from metadata if available
-        const fullName = data.user.user_metadata?.full_name;
-        if (fullName) {
-          updateProfile({ name: fullName });
-        }
-        setSuccessMessage('Login successful! Entering Skyora...');
-        const targetPath = (location.state as any)?.from?.pathname || '/';
-        setTimeout(() => {
-          navigate(targetPath, { replace: true });
-        }, 500);
+      // 1. Verify session
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      // 2. Verify user
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!session || !user) {
+        setErrorMessage('Authentication session could not be established. Please try again.');
+        setIsLoading(false);
+        return;
       }
+
+      // Sync registered full name from metadata
+      const fullName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
+      updateProfile({ name: fullName, id: user.id });
+
+      setSuccessMessage('Login successful! Entering Skyora...');
+      const targetPath = (location.state as any)?.from?.pathname || '/';
+      setTimeout(() => {
+        navigate(targetPath, { replace: true });
+      }, 500);
     } catch (err: any) {
       setErrorMessage(getFriendlyErrorMessage(err));
       setIsLoading(false);

@@ -33,14 +33,24 @@ export const ProfilePage: React.FC = () => {
     setUnits,
     resetPersonalization,
     deleteUserData,
+    clearUserSessionData,
   } = useAppStore();
 
-  const [nameInput, setNameInput] = useState(profile.name);
+  const [nameInput, setNameInput] = useState(
+    user?.user_metadata?.full_name || profile.name || 'User'
+  );
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
   const [saveErrorMsg, setSaveErrorMsg] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const currentName = user?.user_metadata?.full_name || profile.name;
+    if (currentName) {
+      setNameInput(currentName);
+    }
+  }, [user, profile.name]);
 
   const allActivities: ActivityType[] = [
     'Running',
@@ -455,6 +465,7 @@ export const ProfilePage: React.FC = () => {
             type="button"
             id="profile-signout-btn"
             onClick={async () => {
+              clearUserSessionData();
               await signOut();
               navigate('/login', { replace: true });
             }}

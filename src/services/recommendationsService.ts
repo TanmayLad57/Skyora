@@ -17,8 +17,19 @@ export const saveRecommendation = async (
   content: any
 ): Promise<{ data: SupabaseRecommendation | null; error: Error | null }> => {
   try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { data: null, error: authError || new Error('User not authenticated') };
+    }
+
+    const currentUserId = user.id;
+
     const payload = {
-      user_id: userId,
+      user_id: currentUserId,
       recommendation_type: recommendationType,
       content: content,
     };
@@ -45,14 +56,25 @@ export const saveRecommendation = async (
  * Retrieve saved recommendations for the current authenticated user.
  */
 export const getRecommendations = async (
-  userId: string,
+  userId?: string,
   limit = 20
 ): Promise<{ data: SupabaseRecommendation[] | null; error: Error | null }> => {
   try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { data: null, error: authError || new Error('User not authenticated') };
+    }
+
+    const currentUserId = user.id;
+
     const { data, error } = await supabase
       .from('recommendations')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', currentUserId)
       .order('created_at', { ascending: false })
       .limit(limit);
 

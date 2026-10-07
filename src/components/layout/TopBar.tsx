@@ -33,6 +33,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
     setModeOverride,
     setActiveLocation,
     setCityDirectly,
+    clearUserSessionData,
   } = useAppStore();
 
   const [showLocationMenu, setShowLocationMenu] = useState(false);
@@ -65,6 +66,16 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
     const displayH = hour % 12 === 0 ? 12 : hour % 12;
     return `${displayH}:00 ${period}`;
   };
+
+  const isDemoPersona =
+    activePersonaId === 'aarav' ||
+    activePersonaId === 'neha' ||
+    activePersonaId === 'rahul';
+
+  const currentDisplayName = isDemoPersona
+    ? profile.name
+    : (user?.user_metadata?.full_name || profile.name || 'User');
+  const firstName = currentDisplayName.split(' ')[0];
 
   return (
     <header className="h-16 bg-white border-b border-slate-200/80 px-4 md:px-6 flex items-center justify-between gap-4 sticky top-0 z-30 select-none">
@@ -222,10 +233,11 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
           )}
         </div>
 
-        {/* Demo Persona Switcher Button */}
+        {/* User Account / Persona Switcher Button */}
         <div className="relative">
           <button
             type="button"
+            id="topbar-user-menu-btn"
             onClick={() => {
               setShowPersonaMenu(!showPersonaMenu);
               setShowLocationMenu(false);
@@ -234,8 +246,10 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors shadow-xs"
           >
             <User className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden sm:inline">Demo: {profile.name.split(' ')[0]} ({profile.primaryActivity})</span>
-            <span className="sm:hidden">{profile.name.split(' ')[0]}</span>
+            <span className="hidden sm:inline">
+              {isDemoPersona ? `Demo: ${firstName}` : firstName} ({profile.primaryActivity || 'Overview'})
+            </span>
+            <span className="sm:hidden">{firstName}</span>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
           </button>
 
@@ -326,6 +340,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
                   id="topbar-signout-btn"
                   onClick={async () => {
                     setShowPersonaMenu(false);
+                    clearUserSessionData();
                     await signOut();
                     navigate('/login', { replace: true });
                   }}

@@ -4,13 +4,15 @@ import { WeatherArt } from '../ui/WeatherArt';
 import { CardFeedbackButton } from '../ui/CardFeedbackButton';
 import { MapPin, ArrowUp, ArrowDown } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+import { useAuth } from '../../context/AuthContext';
 
 interface HeroWeatherCardProps {
   card: EngineCard;
 }
 
 export const HeroWeatherCard: React.FC<HeroWeatherCardProps> = ({ card }) => {
-  const { profile, simulatedHour } = useAppStore();
+  const { user } = useAuth();
+  const { profile, simulatedHour, activePersonaId } = useAppStore();
   const { city, state, temp, feelsLike, condition, conditionText, rainfallMm, rainProb, high, low } = card.data;
 
   // Determine greeting based on simulated time
@@ -20,6 +22,9 @@ export const HeroWeatherCard: React.FC<HeroWeatherCardProps> = ({ card }) => {
   else if (simulatedHour >= 21 || simulatedHour < 5) greeting = 'Good night';
 
   const unitSymbol = profile.units === 'F' ? '°F' : '°C';
+  const isDemoPersona = activePersonaId === 'aarav' || activePersonaId === 'neha' || activePersonaId === 'rahul';
+  const displayName = isDemoPersona ? profile.name : (user?.user_metadata?.full_name || profile.name || 'User');
+  const firstName = displayName.split(' ')[0];
 
   return (
     <div className="bg-white rounded-xl border border-slate-200/80 p-6 shadow-xs relative overflow-hidden transition-all">
@@ -30,7 +35,7 @@ export const HeroWeatherCard: React.FC<HeroWeatherCardProps> = ({ card }) => {
             <MapPin className="w-3.5 h-3.5 text-slate-400" />
             <span>{city}, {state}</span>
             <span aria-hidden="true">·</span>
-            <span>{greeting}, {profile.name.split(' ')[0]}</span>
+            <span>{greeting}, {firstName}</span>
           </div>
           <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
             {conditionText}

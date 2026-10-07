@@ -15,13 +15,24 @@ export interface SupabaseLocation {
  * Fetch all locations saved by the current authenticated user.
  */
 export const getLocations = async (
-  userId: string
+  userId?: string
 ): Promise<{ data: SavedLocation[] | null; error: Error | null }> => {
   try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { data: null, error: authError || new Error('User not authenticated') };
+    }
+
+    const currentUserId = user.id;
+
     const { data, error } = await supabase
       .from('locations')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', currentUserId)
       .order('created_at', { ascending: true });
 
     if (error) {
@@ -59,8 +70,19 @@ export const createLocation = async (
   }
 ): Promise<{ data: SavedLocation | null; error: Error | null }> => {
   try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { data: null, error: authError || new Error('User not authenticated') };
+    }
+
+    const currentUserId = user.id;
+
     const payload = {
-      user_id: userId,
+      user_id: currentUserId,
       label: location.label,
       city_name: location.cityName,
       latitude: location.latitude,
@@ -107,6 +129,15 @@ export const updateLocation = async (
   }
 ): Promise<{ data: any | null; error: Error | null }> => {
   try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { data: null, error: authError || new Error('User not authenticated') };
+    }
+
     const payload: Partial<SupabaseLocation> = {};
     if (updates.label !== undefined) payload.label = updates.label;
     if (updates.cityName !== undefined) payload.city_name = updates.cityName;
@@ -117,6 +148,7 @@ export const updateLocation = async (
       .from('locations')
       .update(payload)
       .eq('id', locationId)
+      .eq('user_id', user.id)
       .select()
       .single();
 
@@ -139,10 +171,20 @@ export const deleteLocation = async (
   locationId: string
 ): Promise<{ error: Error | null }> => {
   try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { error: authError || new Error('User not authenticated') };
+    }
+
     const { error } = await supabase
       .from('locations')
       .delete()
-      .eq('id', locationId);
+      .eq('id', locationId)
+      .eq('user_id', user.id);
 
     if (error) {
       console.error('Error deleting location from Supabase:', error.message);

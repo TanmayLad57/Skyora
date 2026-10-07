@@ -32,7 +32,7 @@ export const OnboardingPage: React.FC = () => {
   const [step, setStep] = useState<number>(1);
 
   // Form State
-  const [name, setName] = useState<string>('Priya Sharma');
+  const [name, setName] = useState<string>(user?.user_metadata?.full_name || '');
   const [units, setUnits] = useState<TemperatureUnit>('C');
   const [selectedActivities, setSelectedActivities] = useState<ActivityType[]>([
     'Running',
@@ -44,6 +44,12 @@ export const OnboardingPage: React.FC = () => {
   const [timeOfDay, setTimeOfDay] = useState<'morning' | 'evening'>('evening');
   const [commuteStart, setCommuteStart] = useState<number>(18);
   const [notifications, setNotifications] = useState<boolean>(true);
+
+  React.useEffect(() => {
+    if (user?.user_metadata?.full_name && !name) {
+      setName(user.user_metadata.full_name);
+    }
+  }, [user]);
 
   const allActivities: { type: ActivityType; desc: string }[] = [
     { type: 'Running', desc: 'Rain-free roads & low heat stress' },
@@ -74,8 +80,8 @@ export const OnboardingPage: React.FC = () => {
 
   // Construct draft profile for live preview
   const draftProfile: UserProfile = {
-    id: 'user-custom',
-    name: name || 'User',
+    id: user?.id || 'user-custom',
+    name: name.trim() || user?.user_metadata?.full_name || 'User',
     units,
     primaryActivity,
     selectedActivities,
@@ -108,6 +114,7 @@ export const OnboardingPage: React.FC = () => {
 
   const handleFinish = async () => {
     setIsSubmitting(true);
+    const finalName = name.trim() || user?.user_metadata?.full_name || 'User';
     try {
       if (user) {
         // 1. Persist preferences to Supabase
@@ -130,15 +137,23 @@ export const OnboardingPage: React.FC = () => {
         });
 
         // 3. Update auth user name metadata if present
-        if (name.trim()) {
-          await supabase.auth.updateUser({ data: { full_name: name.trim() } });
+        if (finalName && finalName !== user.user_metadata?.full_name) {
+          await supabase.auth.updateUser({ data: { full_name: finalName } });
         }
       }
-      completeOnboarding(draftProfile);
+      completeOnboarding({
+        ...draftProfile,
+        id: user?.id || draftProfile.id,
+        name: finalName,
+      });
       navigate('/');
     } catch (err) {
       console.error('Error saving onboarding data to Supabase:', err);
-      completeOnboarding(draftProfile);
+      completeOnboarding({
+        ...draftProfile,
+        id: user?.id || draftProfile.id,
+        name: finalName,
+      });
       navigate('/');
     } finally {
       setIsSubmitting(false);
