@@ -19,15 +19,15 @@ export const getLocations = async (
 ): Promise<{ data: SavedLocation[] | null; error: Error | null }> => {
   try {
     const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
 
-    if (authError || !user) {
-      return { data: null, error: authError || new Error('User not authenticated') };
+    if (sessionError || !session?.user) {
+      return { data: null, error: sessionError || new Error('User not authenticated') };
     }
 
-    const currentUserId = user.id;
+    const currentUserId = session.user.id;
 
     const { data, error } = await supabase
       .from('locations')
@@ -71,15 +71,15 @@ export const createLocation = async (
 ): Promise<{ data: SavedLocation | null; error: Error | null }> => {
   try {
     const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
 
-    if (authError || !user) {
-      return { data: null, error: authError || new Error('User not authenticated') };
+    if (sessionError || !session?.user) {
+      return { data: null, error: sessionError || new Error('User not authenticated') };
     }
 
-    const currentUserId = user.id;
+    const currentUserId = session.user.id;
 
     const payload = {
       user_id: currentUserId,
@@ -130,12 +130,12 @@ export const updateLocation = async (
 ): Promise<{ data: any | null; error: Error | null }> => {
   try {
     const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
 
-    if (authError || !user) {
-      return { data: null, error: authError || new Error('User not authenticated') };
+    if (sessionError || !session?.user) {
+      return { data: null, error: sessionError || new Error('User not authenticated') };
     }
 
     const payload: Partial<SupabaseLocation> = {};
@@ -148,7 +148,7 @@ export const updateLocation = async (
       .from('locations')
       .update(payload)
       .eq('id', locationId)
-      .eq('user_id', user.id)
+      .eq('user_id', session.user.id)
       .select()
       .single();
 
@@ -172,19 +172,19 @@ export const deleteLocation = async (
 ): Promise<{ error: Error | null }> => {
   try {
     const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
 
-    if (authError || !user) {
-      return { error: authError || new Error('User not authenticated') };
+    if (sessionError || !session?.user) {
+      return { error: sessionError || new Error('User not authenticated') };
     }
 
     const { error } = await supabase
       .from('locations')
       .delete()
       .eq('id', locationId)
-      .eq('user_id', user.id);
+      .eq('user_id', session.user.id);
 
     if (error) {
       console.error('Error deleting location from Supabase:', error.message);

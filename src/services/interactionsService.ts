@@ -17,15 +17,15 @@ export const recordInteraction = async (
 ): Promise<{ data: SupabaseInteraction | null; error: Error | null }> => {
   try {
     const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
 
-    if (authError || !user) {
-      return { data: null, error: authError || new Error('User not authenticated') };
+    if (sessionError || !session?.user) {
+      return { data: null, error: sessionError || new Error('User not authenticated') };
     }
 
-    const currentUserId = user.id;
+    const currentUserId = session.user.id;
 
     const payload = {
       user_id: currentUserId,
@@ -59,15 +59,15 @@ export const getInteractions = async (
 ): Promise<{ data: UserInteraction[] | null; error: Error | null }> => {
   try {
     const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
 
-    if (authError || !user) {
-      return { data: null, error: authError || new Error('User not authenticated') };
+    if (sessionError || !session?.user) {
+      return { data: null, error: sessionError || new Error('User not authenticated') };
     }
 
-    const currentUserId = user.id;
+    const currentUserId = session.user.id;
 
     const { data, error } = await supabase
       .from('interactions')

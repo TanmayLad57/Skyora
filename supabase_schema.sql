@@ -76,20 +76,11 @@ alter table public.interactions enable row level security;
 
 -- USER PREFERENCES
 
-create policy "Users can view own preferences"
+create policy "Users can manage own preferences"
 on public.user_preferences
-for select
-using (auth.uid() = user_id);
-
-create policy "Users can insert own preferences"
-on public.user_preferences
-for insert
+for all
+using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
-
-create policy "Users can update own preferences"
-on public.user_preferences
-for update
-using (auth.uid() = user_id);
 
 
 -- LOCATIONS
